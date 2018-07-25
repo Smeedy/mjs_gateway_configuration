@@ -28,8 +28,15 @@ case "$hostname" in
   mjs-bergen-*)
     authorized_keys="authorized_keys_bergen"
     ;;
-  *)
+  mjs-amersfoort-*)
     authorized_keys="authorized_keys_amersfoort"
+    ;;
+  *)
+  ksp-*)
+    authorized_keys="authorized_keys_ksp"
+    ;;
+  *)
+    authorized_keys="authorized_keys_default"
     ;;
 esac
 
@@ -41,16 +48,16 @@ __file /root/.ssh/authorized_keys \
 ############################################
 # Nuttssh remote access
 ############################################
-__user nuttssh --system --create-home --password !
+#__user nuttssh --system --create-home --password !
 
 # TODO: This generates an ssh key as part of the service startup. It
 # would be nicer if cdist did this, and printed the public key for
 # configuring the Nuttssh server.
-__systemd_unit nuttssh.service \
-	--source $__files/nuttssh/nuttssh.service \
-	--state present \
-        --restart \
-        --enablement-state enabled
+#__systemd_unit nuttssh.service \
+#	--source $__files/nuttssh/nuttssh.service \
+#	--state present \
+#        --restart \
+#        --enablement-state enabled
 
 ############################################
 # Lock debian user's password
@@ -58,7 +65,7 @@ __systemd_unit nuttssh.service \
 # This replaces the user's password with !, which effectively prevents
 # password auth for the user, similar to what passwd --lock does. This
 # does not prevent key authentication for the user.
-__user debian --password !
+#__user debian --password !
 
 ############################################
 # Apt
@@ -139,7 +146,7 @@ __config_file /opt/ttn-gateway/global_conf.json \
   --source $__files/forwarder/global_conf.json
 
 # Get the access key to use from TTN
-ttnkey=$(ttnctl gateways info "${hostname}" | grep 'Access Key' | sed 's/\s*Access Key: //')
+ttnkey=${CDIST_TTN_KEY}
 
 if [ -z "$ttnkey" ]; then
   # If we couldn't get the key, assume that one is already configured.
@@ -147,7 +154,7 @@ if [ -z "$ttnkey" ]; then
   # otherwise?
   echo "Could not figure out TTN gateway key, skipping gateway configuration!" 2>1
 else
-  echo "Found TTN gateway key: ${ttnkey}"
+  echo "TTN gateway key: ${ttnkey}"
   # TODO: Start and configure gateway using something like:
   #   https://github.com/jpmeijers/ttn-resin-gateway-rpi/blob/master/run.py
   # Possibly using Adafruit_BBIO for GPIO instead of ResetIC880A above:
@@ -176,31 +183,31 @@ fi
 ############################################
 # OpenVPN
 ############################################
-__package_apt openvpn
-
-if [ -f "$__files/vpn/keys/${hostname}.crt" -a -f "$__files/vpn/keys/${hostname}.crt" ]; then
-  __directory /etc/openvpn/tika
-
-  __config_file /etc/openvpn/tika/ca.crt \
-    --source $__files/vpn/tika/ca.crt
-
-  __config_file /etc/openvpn/tika/client.crt \
-    --source $__files/vpn/keys/${hostname}.crt
-
-  __config_file /etc/openvpn/tika/client.key \
-    --source $__files/vpn/keys/${hostname}.key
-
-  # This restarts only when tika.conf is changed, see
-  # https://github.com/ungleich/cdist/issues/637
-  __config_file /etc/openvpn/tika.conf \
-    --source $__files/vpn/tika.conf \
-    --onchange 'systemctl restart openvpn@tika.service'
-
-  __start_on_boot openvpn@tika.service
-else
-  # TODO: Check if keys are already present
-  echo "OpenVPN client keys not found, skipping them!" 2>1
-fi
+#__package_apt openvpn
+#
+#if [ -f "$__files/vpn/keys/${hostname}.crt" -a -f "$__files/vpn/keys/${hostname}.crt" ]; then
+#  __directory /etc/openvpn/tika
+#
+#  __config_file /etc/openvpn/tika/ca.crt \
+#    --source $__files/vpn/tika/ca.crt
+#
+#  __config_file /etc/openvpn/tika/client.crt \
+#    --source $__files/vpn/keys/${hostname}.crt
+#
+#  __config_file /etc/openvpn/tika/client.key \
+#    --source $__files/vpn/keys/${hostname}.key
+#
+#  # This restarts only when tika.conf is changed, see
+#  # https://github.com/ungleich/cdist/issues/637
+#  __config_file /etc/openvpn/tika.conf \
+#    --source $__files/vpn/tika.conf \
+#    --onchange 'systemctl restart openvpn@tika.service'
+#
+#  __start_on_boot openvpn@tika.service
+#else
+#  # TODO: Check if keys are already present
+#  echo "OpenVPN client keys not found, skipping them!" 2>1
+#fi
 
 
 ############################################
@@ -213,9 +220,9 @@ fi
 # the gateway and touches that file every 6h (or so). Then the entire
 # stack of VPN and SSH access is tested, instead of just the IP
 # connection.
-__config_file /etc/cron.daily/vpn-check \
-  --source $__files/vpn-check \
-  --mode 755
+#__config_file /etc/cron.daily/vpn-check \
+#  --source $__files/vpn-check \
+#  --mode 755
 
 ############################################
 # HTU21D Temperature / Humidity sensor
@@ -225,20 +232,39 @@ __config_file /etc/cron.daily/vpn-check \
 # SI7013/20/21 sensor connected to the I²C grove port (i2c2) on the
 # BeagleBoard Green. After loading, the sensor can be read through
 # /sys/bus/iio or /sys/bus/i2c.
-__file /lib/firmware/SI7020.dtbo \
-  --source $__files/si7020/SI7020.dtbo
+#__file /lib/firmware/SI7020.dtbo \
+#  --source $__files/si7020/SI7020.dtbo
 
 # TODO: Make optional? Now it just tries to load and fails if no sensor
 # is present, though this does not have any side effects (provided no
 # other I²C device is at the same address).
-__line enable_si7020 \
-  --file /boot/uEnv.txt \
-  --line 'uboot_overlay_addr4=/lib/firmware/SI7020.dtbo'
+#__line enable_si7020 \
+#  --file /boot/uEnv.txt \
+#  --line 'uboot_overlay_addr4=/lib/firmware/SI7020.dtbo'
 
 ############################################
 # 3G keepalive hack
 ############################################
-__systemd_unit 3g-keepalive-hack.service \
-	--source $__files/3g-keepalive-hack/3g-keepalive-hack.service \
+#__systemd_unit 3g-keepalive-hack.service \
+#	--source $__files/3g-keepalive-hack/3g-keepalive-hack.service \
+#	--state present \
+#       --enablement-state enabled
+
+############################################
+# Some cleanup:
+# disable unneeded services
+############################################
+
+__systemd_unit apache2.service \
 	--state present \
-        --enablement-state enabled
+        --enablement-state disabled
+
+__systemd_unit bonescript.service \
+	--state present \
+        --enablement-state disabled
+__systemd_unit bonescript.socket \
+	--state present \
+        --enablement-state disabled
+__systemd_unit bonescript-autorun.service \
+	--state present \
+        --enablement-state disabled
