@@ -2,7 +2,7 @@
 export CDIST_ORDER_DEPENDENCY=1
 
 ############################################
-# Hostname
+# Hostname + system config
 ############################################
 
 # Since $__targethost specifies *how* to reach the gateway, but not
@@ -20,6 +20,18 @@ else
   echo "Using existing hostname \"${hostname}\""
 fi
 
+__line hostname_to_hosts \
+    --file /etc/hosts \
+    --line "127.0.0.1	${hostname}"
+#    --after '^127\.0\.0\.1[[:space:]]+beagle'
+
+tz=${CDIST_TZ}
+if [ -z "$tz" ]; then
+  __timezone Europe/Amsterdam
+else
+  __timezone $tz
+fi
+
 ############################################
 # SSH keys
 ############################################
@@ -31,7 +43,6 @@ case "$hostname" in
   mjs-amersfoort-*)
     authorized_keys="authorized_keys_amersfoort"
     ;;
-  *)
   ksp-*)
     authorized_keys="authorized_keys_ksp"
     ;;
@@ -65,7 +76,7 @@ __file /root/.ssh/authorized_keys \
 # This replaces the user's password with !, which effectively prevents
 # password auth for the user, similar to what passwd --lock does. This
 # does not prevent key authentication for the user.
-#__user debian --password !
+__user debian --password !
 
 ############################################
 # Apt
@@ -123,6 +134,7 @@ for f in libpaho-embed-mqtt3c.so.1.0  libttn-gateway-connector.so; do
   __file "/usr/local/lib/$f" --source "$__files/forwarder/lib/$f"
 done
 __link /usr/local/lib/libpaho-embed-mqtt3c.so.1 --source libpaho-embed-mqtt3c.so.1.0 --type symbolic
+
 
 # Tool to reset concentrator board by twiddling some GPIO pin.
 # Copied from an older Lorank gateway, (some version of) the source can
@@ -243,12 +255,16 @@ fi
 #  --line 'uboot_overlay_addr4=/lib/firmware/SI7020.dtbo'
 
 ############################################
-# 3G keepalive hack
+# 3G/4G Huawei keepalive hack
 ############################################
-#__systemd_unit 3g-keepalive-hack.service \
-#	--source $__files/3g-keepalive-hack/3g-keepalive-hack.service \
-#	--state present \
-#       --enablement-state enabled
+__systemd_unit 3g-keepalive-hack.service \
+  --source $__files/3g-keepalive-hack/3g-keepalive-hack.service \
+  --state present \
+  --enablement-state enabled
+
+__file /etc/usb_modeswitch.d/huawei_e3.conf \
+  --source $__files/3g-keepalive-hack/usb_modeswitch.d_huawei_e3.conf
+
 
 ############################################
 # Some cleanup:

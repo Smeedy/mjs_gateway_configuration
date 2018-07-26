@@ -21,7 +21,10 @@ Type=simple
 # return traffic, saving half the bandwidth.
 # Before doing the ping, check if there are any Huawei devices present.
 # If not, just return.
-ExecStart=/bin/sh -c "lsusb -d12d1: && ping -q -i 3 -s 0 192.0.2.1 || echo 'No Huawei device found, no need to ping'"
+ExecStart=/bin/sh -c "\
+lsusb -d12d1:14dc: && ping -q -i 3 -s 0 192.168.8.1 || \
+lsusb -d12d1: && ping -q -i 3 -s 0 192.0.2.1 || \
+echo 'No Huawei device found, no need to ping'"
 
 # Make sure to recheck for a Huawei device every 5min if not found.
 # Also, if the ping crashes for some reason, this makes sure to restart
